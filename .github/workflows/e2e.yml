@@ -9,6 +9,10 @@ jobs:
   e2e:
     name: Playwright E2E
     runs-on: ubuntu-latest
+    permissions:
+      contents: read        # checkout
+      checks: write         # mikepenz/action-junit-report — create check runs
+      pull-requests: write  # PR annotations from Playwright github reporter
 
     steps:
       - uses: actions/checkout@v4
