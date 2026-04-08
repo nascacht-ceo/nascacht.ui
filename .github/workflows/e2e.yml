@@ -13,6 +13,8 @@ jobs:
       contents: read        # checkout
       checks: write         # mikepenz/action-junit-report — create check runs
       pull-requests: write  # PR annotations from Playwright github reporter
+      pages: write          # actions/deploy-pages
+      id-token: write       # actions/deploy-pages OIDC token
 
     steps:
       - uses: actions/checkout@v4
@@ -88,12 +90,13 @@ jobs:
 
       # Deploy the HTML report to GitHub Pages so it's viewable in-browser
       # without downloading. URL: https://nascacht-ceo.github.io/nascacht.ui/
-      # Each push overwrites the previous report — only the latest run is live.
-      # Requires: Settings → Pages → Source = "GitHub Actions"
-      - name: Deploy report to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
+      # Requires: Settings → Pages → Source = "GitHub Actions" (already set)
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
         if: always() && github.ref == 'refs/heads/main'
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: playwright-report
-          keep_files: false
+          path: playwright-report
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
+        if: always() && github.ref == 'refs/heads/main'
