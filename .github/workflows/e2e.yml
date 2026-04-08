@@ -9,6 +9,9 @@ jobs:
   e2e:
     name: Playwright E2E
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
     permissions:
       contents: read        # checkout
       checks: write         # mikepenz/action-junit-report — create check runs
@@ -98,5 +101,6 @@ jobs:
           path: playwright-report
 
       - name: Deploy to GitHub Pages
+        id: deploy
         uses: actions/deploy-pages@v4
         if: always() && github.ref == 'refs/heads/main'
