@@ -1,0 +1,25 @@
+/*
+ * nascacht-ui — Light theme
+ *
+ * Sets the 6 seed variables. All other tokens are calculated by tokens.css.
+ *
+ * To apply:
+ *   <link rel="stylesheet" href="nascacht-ui/themes/light.css">
+ *   — or —
+ *   <nascacht-provider data-nc-theme="light">
+ */
+
+@import '../tokens.css';
+
+:root,
+[data-nc-theme="light"] {
+  color-scheme: light;
+
+  /* ── Seeds ── */
+  --nc-brand:          oklch(52% 0.20 240);   /* medium blue */
+  --nc-surface-l:      0.98;                  /* near-white */
+  --nc-radius-unit:    4px;
+  --nc-space-unit:     0.25rem;               /* 4px base → 1rem at ×4 */
+  --nc-font-family:    system-ui, -apple-system, "Segoe UI", sans-serif;
+  --nc-font-size-root: 1rem;
+}

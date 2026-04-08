@@ -1,0 +1,31 @@
+/*
+ * nascacht-ui — Auto theme (follows OS preference)
+ *
+ * Light seeds are applied by default.
+ * Dark seeds override when prefers-color-scheme: dark fires.
+ *
+ * To apply:
+ *   <link rel="stylesheet" href="nascacht-ui/themes/auto.css">
+ */
+
+@import '../tokens.css';
+
+:root {
+  color-scheme: light dark;
+
+  /* Light seeds (default) */
+  --nc-brand:          oklch(52% 0.20 240);
+  --nc-surface-l:      0.98;
+  --nc-radius-unit:    4px;
+  --nc-space-unit:     0.25rem;
+  --nc-font-family:    system-ui, -apple-system, "Segoe UI", sans-serif;
+  --nc-font-size-root: 1rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-nc-theme]) {
+    color-scheme: dark;
+    --nc-brand:     oklch(62% 0.20 240);
+    --nc-surface-l: 0.12;
+  }
+}

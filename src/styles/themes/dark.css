@@ -1,0 +1,27 @@
+/*
+ * nascacht-ui — Dark theme
+ *
+ * Same seeds as light, except:
+ *   --nc-surface-l drops from 0.98 → 0.12  (dark background)
+ *   --nc-brand lightness bumps up slightly   (keeps contrast on dark surface)
+ *
+ * To apply:
+ *   <link rel="stylesheet" href="nascacht-ui/themes/dark.css">
+ *   — or —
+ *   <nascacht-provider data-nc-theme="dark">
+ */
+
+@import '../tokens.css';
+
+:root,
+[data-nc-theme="dark"] {
+  color-scheme: dark;
+
+  /* ── Seeds ── */
+  --nc-brand:          oklch(62% 0.20 240);   /* slightly lighter blue — contrast on dark bg */
+  --nc-surface-l:      0.12;                  /* near-black */
+  --nc-radius-unit:    4px;
+  --nc-space-unit:     0.25rem;
+  --nc-font-family:    system-ui, -apple-system, "Segoe UI", sans-serif;
+  --nc-font-size-root: 1rem;
+}

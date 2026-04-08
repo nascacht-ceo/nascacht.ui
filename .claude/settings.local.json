@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p ~/.gstack)",
+      "Bash(~/.gstack/just-upgraded-from)",
+      "Bash(rm -f ~/.gstack/last-update-check)",
+      "Bash(rm -f ~/.gstack/update-snoozed)",
+      "Read(//c/Users/EricPatrick/.claude/skills/gstack/**)",
+      "Bash(find /c/Users/EricPatrick/source/repos/qbo4.Configuration/src/qbo4.Configuration.Web -not -path */bin/* -not -path */obj/* -not -path */node_modules/*)",
+      "Bash(find /c/Users/EricPatrick/source/repos/qbo4.Configuration/src/qbo4.Configuration.Web/src -name *.ts -not -name *.d.ts)",
+      "Bash(~/.claude/skills/gstack/bin/gstack-review-log '{\"\"skill\"\":\"\"plan-eng-review\"\",\"\"timestamp\"\":\"\"2026-04-01T20:03:05Z\"\",\"\"status\"\":\"\"issues_open\"\",\"\"unresolved\"\":0,\"\"critical_gaps\"\":1,\"\"mode\"\":\"\"FULL_REVIEW\"\",\"\"commit\"\":\"\"none\"\"}')",
+      "Bash(~/.claude/skills/gstack/bin/gstack-review-read)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(code:*)",
+      "WebSearch"
+    ]
+  }
+}

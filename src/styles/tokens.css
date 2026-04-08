@@ -1,0 +1,215 @@
+/*
+ * nascacht-ui — design token derivation layer
+ *
+ * Consumers set 6 seed variables. Everything else is calculated.
+ *
+ * Seeds (set these in your theme file):
+ *   --nc-brand          oklch color  — primary brand hue; all color scale derives from this
+ *   --nc-surface-l      0–1          — base surface lightness (0.98 = near-white, 0.12 = near-black)
+ *   --nc-radius-unit    px           — base corner radius; all radii are multiples
+ *   --nc-space-unit     rem          — base spacing unit; all spacing is multiples
+ *   --nc-font-family    string       — typeface stack
+ *   --nc-font-size-root rem          — root font size; all type scale derives from this
+ *
+ * Color derivation uses oklch relative color syntax: oklch(from <origin> l c h)
+ *   — `from <origin>` MUST be the first argument (spec requirement)
+ *   — l, c, h refer to the origin color's channels; var() and calc() are valid channel values
+ *
+ * Supported: Chrome 119+, Firefox 128+, Safari 16.4+ (all 2024+ browsers)
+ */
+
+:root,
+[data-nc-theme] {
+
+  /* ── Color scale ──────────────────────────────────────────────────────────
+   *
+   *   --nc-brand  (seed)
+   *       │
+   *       ├─ primary        = brand (direct)
+   *       ├─ primary-hover  = brand, lightness −0.06 (slightly darker)
+   *       ├─ primary-muted  = brand at 12% opacity blended into surface
+   *       ├─ secondary      = same hue, chroma ×0.45, lightness +0.18 (softer)
+   *       ├─ accent         = complementary hue (hue +180°), same L and C
+   *       ├─ on-primary     = inverted lightness (contrast text on brand bg)
+   *       └─ status colors  = fixed hues (145°/75°/25°/240°) at brand lightness
+   *
+   * Surface layering uses a toward-midpoint step so direction flips automatically:
+   *   Light mode: each level steps darker  (toward 0.5 from 0.98)
+   *   Dark mode:  each level steps lighter (toward 0.5 from 0.12)
+   */
+
+  --nc-color-primary:         var(--nc-brand);
+  --nc-color-primary-hover:   oklch(from var(--nc-brand) calc(l - 0.06) c h);
+  --nc-color-primary-muted:   color-mix(in oklch, var(--nc-brand) 12%, var(--nc-surface));
+  --nc-color-primary-ring:    color-mix(in oklch, var(--nc-brand) 40%, transparent);
+
+  /* Secondary: same hue family, reduced chroma, lighter */
+  --nc-color-secondary:       oklch(from var(--nc-brand) calc(l + 0.18) calc(c * 0.45) h);
+  --nc-color-secondary-hover: oklch(from var(--nc-brand) calc(l + 0.12) calc(c * 0.45) h);
+  --nc-color-secondary-muted: color-mix(in oklch, var(--nc-color-secondary) 15%, var(--nc-surface));
+
+  /* Accent: complementary hue */
+  --nc-color-accent:          oklch(from var(--nc-brand) l c calc(h + 180));
+  --nc-color-accent-muted:    color-mix(in oklch, var(--nc-color-accent) 12%, var(--nc-surface));
+
+  /* Text on a primary-colored background.
+   * Formula: invert lightness relative to 0.55 midpoint, clamp to readable range.
+   * Brand L < 0.55 → light text (0.95). Brand L > 0.55 → dark text (0.15). */
+  --nc-on-primary: oklch(from var(--nc-brand) clamp(0.1, calc(1.1 - l * 2), 0.96) 0.01 h);
+
+  /* Semantic status — fixed hues, lightness matches brand */
+  --nc-color-success: oklch(from var(--nc-brand) l 0.17 145);
+  --nc-color-warning: oklch(from var(--nc-brand) calc(l + 0.1) 0.17 75);
+  --nc-color-error:   oklch(from var(--nc-brand) l 0.22 25);
+  --nc-color-info:    oklch(from var(--nc-brand) l 0.17 240);
+
+  /* ── Surface scale ────────────────────────────────────────────────────────
+   *
+   * --nc-surface-l (seed, 0–1) drives the entire surface stack.
+   * We keep the brand's hue at very low chroma (0.005–0.008) for a subtle tint.
+   *
+   * Surface step moves TOWARD the lightness midpoint (0.5) so the direction
+   * automatically flips between light and dark modes:
+   *
+   *   Light (surface-l=0.98): step = (0.5−0.98)×0.055 = −0.026 → each level darker  ✓
+   *   Dark  (surface-l=0.12): step = (0.5−0.12)×0.055 = +0.021 → each level lighter ✓
+   *
+   *   base     = --nc-surface-l
+   *   raised   = base + step×1   (cards above the page)
+   *   sunken   = base + step×2   (inputs, well areas)
+   *   overlay  = base + step×3   (modals, drawers)
+   *
+   * Text lightness = 1 − surface-l + 0.05 → inverts automatically.
+   *   Light theme (surface-l=0.98): text-l = 0.07  → near-black  ✓
+   *   Dark theme  (surface-l=0.12): text-l = 0.93  → near-white  ✓
+   */
+
+  --nc-surface-step:    calc((0.5 - var(--nc-surface-l)) * 0.055);
+
+  --nc-surface:         oklch(from var(--nc-brand) var(--nc-surface-l)                                          0.005 h);
+  --nc-surface-raised:  oklch(from var(--nc-brand) calc(var(--nc-surface-l) + var(--nc-surface-step))           0.005 h);
+  --nc-surface-sunken:  oklch(from var(--nc-brand) calc(var(--nc-surface-l) + var(--nc-surface-step) * 2)       0.005 h);
+  --nc-surface-overlay: oklch(from var(--nc-brand) calc(var(--nc-surface-l) + var(--nc-surface-step) * 3)       0.008 h);
+
+  /* Border: blends text-primary into the surface — always contrasts in both modes.
+   * color-mix approach avoids fixed lightness offsets that vanish on dark backgrounds. */
+  --nc-border:       color-mix(in oklch, var(--nc-text-primary) 20%, var(--nc-surface));
+  --nc-border-focus: var(--nc-color-primary);
+
+  /* Text colors: inverted lightness from surface, slight brand tint */
+  --nc-text-primary:   oklch(from var(--nc-brand) calc(1.0 - var(--nc-surface-l) + 0.05) 0.02 h);
+  --nc-text-secondary: oklch(from var(--nc-brand) calc(1.0 - var(--nc-surface-l) + 0.05) 0.02 h / 0.6);
+  --nc-text-disabled:  oklch(from var(--nc-brand) calc(1.0 - var(--nc-surface-l) + 0.05) 0.02 h / 0.35);
+  --nc-text-on-brand:  var(--nc-on-primary);
+
+  /* ── Spacing scale ────────────────────────────────────────────────────────
+   *
+   * All steps are integer multiples of --nc-space-unit (default 0.25rem = 4px).
+   *
+   *   1 =  4px   2 =  8px   3 = 12px   4 = 16px   5 = 20px
+   *   6 = 24px   8 = 32px  10 = 40px  12 = 48px  16 = 64px
+   */
+
+  --nc-space-1:  calc(var(--nc-space-unit) * 1);
+  --nc-space-2:  calc(var(--nc-space-unit) * 2);
+  --nc-space-3:  calc(var(--nc-space-unit) * 3);
+  --nc-space-4:  calc(var(--nc-space-unit) * 4);
+  --nc-space-5:  calc(var(--nc-space-unit) * 5);
+  --nc-space-6:  calc(var(--nc-space-unit) * 6);
+  --nc-space-8:  calc(var(--nc-space-unit) * 8);
+  --nc-space-10: calc(var(--nc-space-unit) * 10);
+  --nc-space-12: calc(var(--nc-space-unit) * 12);
+  --nc-space-16: calc(var(--nc-space-unit) * 16);
+
+  /* ── Type scale ───────────────────────────────────────────────────────────
+   *
+   * Modular scale (ratio ≈1.25, Major Third) from --nc-font-size-root.
+   *
+   *   xs=12px  sm=14px  base=16px  lg=18px  xl=20px  2xl=24px  3xl=30px  4xl=36px
+   */
+
+  --nc-text-xs:   calc(var(--nc-font-size-root) * 0.75);
+  --nc-text-sm:   calc(var(--nc-font-size-root) * 0.875);
+  --nc-text-base: var(--nc-font-size-root);
+  --nc-text-lg:   calc(var(--nc-font-size-root) * 1.125);
+  --nc-text-xl:   calc(var(--nc-font-size-root) * 1.25);
+  --nc-text-2xl:  calc(var(--nc-font-size-root) * 1.5);
+  --nc-text-3xl:  calc(var(--nc-font-size-root) * 1.875);
+  --nc-text-4xl:  calc(var(--nc-font-size-root) * 2.25);
+
+  --nc-line-height-tight:  1.25;
+  --nc-line-height-normal: 1.5;
+  --nc-line-height-loose:  1.75;
+
+  --nc-font-weight-normal: 400;
+  --nc-font-weight-medium: 500;
+  --nc-font-weight-bold:   700;
+
+  /* ── Border radius scale ──────────────────────────────────────────────────
+   *
+   *   sm=1×  md=2×  lg=4×  xl=8×  full=pill
+   */
+
+  --nc-radius-sm:   var(--nc-radius-unit);
+  --nc-radius-md:   calc(var(--nc-radius-unit) * 2);
+  --nc-radius-lg:   calc(var(--nc-radius-unit) * 4);
+  --nc-radius-xl:   calc(var(--nc-radius-unit) * 8);
+  --nc-radius-full: 9999px;
+
+  /* ── Shadow scale ─────────────────────────────────────────────────────────
+   *
+   * Shadow color is brand-tinted (colored shadows instead of grey).
+   * Uses relative color: keeps brand hue, reduces chroma, darkens, adds alpha.
+   */
+
+  --nc-shadow-color: oklch(from var(--nc-brand) calc(l - 0.25) calc(c * 0.5) h / 0.15);
+
+  --nc-shadow-sm: 0 1px 2px var(--nc-shadow-color);
+  --nc-shadow-md: 0 4px 8px  var(--nc-shadow-color),
+                  0 1px 2px  var(--nc-shadow-color);
+  --nc-shadow-lg: 0 12px 24px var(--nc-shadow-color),
+                  0 4px  8px  var(--nc-shadow-color);
+
+  /* ── Widget-level tokens ─────────────────────────────────────────────────
+   *
+   * Shared defaults for ALL nascacht widgets (kpi, markdown, table, chart…).
+   * Override these to restyle every widget at once:
+   *
+   *   nascacht-provider { --nc-widget-padding: var(--nc-space-6); }
+   */
+
+  --nc-widget-bg:      var(--nc-surface);
+  --nc-widget-border:  1px solid var(--nc-border);
+  --nc-widget-radius:  var(--nc-radius-md);
+  --nc-widget-shadow:  var(--nc-shadow-sm);
+  --nc-widget-padding: var(--nc-space-4);
+
+  /* Focus ring — all interactive elements */
+  --nc-focus-ring: 0 0 0 3px var(--nc-color-primary-ring);
+
+  /* ── Motion ───────────────────────────────────────────────────────────────*/
+
+  --nc-duration-fast:   100ms;
+  --nc-duration-normal: 200ms;
+  --nc-duration-slow:   300ms;
+  --nc-ease-standard:   cubic-bezier(0.4, 0, 0.2, 1);
+  --nc-ease-enter:      cubic-bezier(0, 0, 0.2, 1);
+  --nc-ease-exit:       cubic-bezier(0.4, 0, 1, 1);
+
+  /* ── Z-index ──────────────────────────────────────────────────────────────*/
+
+  --nc-z-base:    0;
+  --nc-z-raised:  10;
+  --nc-z-overlay: 100;
+  --nc-z-modal:   200;
+  --nc-z-toast:   300;
+}
+
+/* Respect user motion preference */
+@media (prefers-reduced-motion: reduce) {
+  :root, [data-nc-theme] {
+    --nc-duration-fast:   0ms;
+    --nc-duration-normal: 0ms;
+    --nc-duration-slow:   0ms;
+  }
+}
