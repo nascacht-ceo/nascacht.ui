@@ -1,5 +1,7 @@
 # nascacht-ui
 
+[![E2E Tests](https://github.com/nascacht-ceo/nascacht.ui/actions/workflows/e2e.yml/badge.svg)](https://github.com/nascacht-ceo/nascacht.ui/actions/workflows/e2e.yml)
+
 Framework-agnostic dockable widget library built on web components. Drop widgets into any page — React, Angular, Vue, or plain HTML — with VS Code-style drag-and-drop layout, per-client theming, and AI-driven rendering.
 
 ## Features

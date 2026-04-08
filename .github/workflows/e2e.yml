@@ -16,38 +16,54 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm           # caches the npm download cache (~/.npm)
+
+      # ── node_modules cache ─────────────────────────────────────────────────
+      # Key on the lock file — cache hit skips npm ci entirely.
+      - name: Cache node_modules
+        id: node-cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
       - name: Install dependencies
+        if: steps.node-cache.outputs.cache-hit != 'true'
         run: npm ci
 
-      # Cache the Chromium binary so it isn't re-downloaded on every run.
-      # Key includes the lock file so it refreshes when Playwright is updated.
+      # ── Playwright browser cache ───────────────────────────────────────────
+      # Key on the lock file — refreshes only when @playwright/test is updated.
+      # We always run `install --with-deps`: the binary is served from cache,
+      # but OS-level system libs (libglib, libnss, etc.) still need apt-get.
       - name: Cache Playwright browsers
-        id: playwright-cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
-      - name: Install Playwright Chromium
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
+      - name: Install Playwright Chromium + system deps
         run: npx playwright install --with-deps chromium
 
-      # Re-run the system-dep install even on cache hit — the binaries are cached
-      # but OS-level deps (libglib, libnss, etc.) may not be.
-      - name: Install Chromium system dependencies
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
+      # ── Storybook build cache ──────────────────────────────────────────────
+      # Key on every source file that affects the build.
+      # A pure test-file change (*.e2e.ts) doesn't invalidate the cache because
+      # those files are excluded from the hash pattern.
+      - name: Cache Storybook build
+        id: storybook-cache
+        uses: actions/cache@v4
+        with:
+          path: storybook-static
+          key: storybook-${{ runner.os }}-${{ hashFiles('src/**/*.ts', 'src/**/*.css', '.storybook/**') }}-${{ hashFiles('package-lock.json') }}
 
       - name: Build Storybook
+        if: steps.storybook-cache.outputs.cache-hit != 'true'
         run: npm run build:storybook
 
+      # ── Tests ──────────────────────────────────────────────────────────────
       - name: Run E2E tests
         run: npm run test:e2e
 
-      # Renders pass/fail per test case in the workflow Summary tab —
-      # visible directly in GitHub without downloading anything.
+      # ── Results ────────────────────────────────────────────────────────────
+      # Renders pass/fail table directly in the workflow Summary tab.
       - name: Publish test summary
         uses: mikepenz/action-junit-report@v4
         if: always()
@@ -56,8 +72,8 @@ jobs:
           check_name: Playwright results
           fail_on_failure: true
 
-      # Full HTML report with traces — download from the Actions run page
-      # and open with: npx playwright show-report playwright-report
+      # Full HTML report with traces — download and open with:
+      #   npx playwright show-report playwright-report
       - name: Upload HTML report
         uses: actions/upload-artifact@v4
         if: always()
@@ -65,3 +81,15 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 30
+
+      # Deploy the HTML report to GitHub Pages so it's viewable in-browser
+      # without downloading. URL: https://nascacht-ceo.github.io/nascacht.ui/
+      # Each push overwrites the previous report — only the latest run is live.
+      # Requires: Settings → Pages → Source = "GitHub Actions"
+      - name: Deploy report to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        if: always() && github.ref == 'refs/heads/main'
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: playwright-report
+          keep_files: false
