@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/web-components';
 import { html } from 'lit';
-import '../editor/nc-theme-editor.js';
-import '../widgets/nc-kpi.js';
-import '../widgets/nc-markdown.js';
+import '../editor/nascacht-theme-editor.js';
+import '../widgets/nascacht-kpi.js';
+import '../widgets/nascacht-markdown.js';
 
 const meta: Meta = {
   title: 'Editor/nc-theme-editor',

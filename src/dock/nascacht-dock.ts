@@ -12,6 +12,73 @@ import { LocalStoragePersistenceAdapter } from './dock-persistence.js';
 type DockviewApi = import('dockview-core').DockviewApi;
 type DockviewComponent = import('dockview-core').DockviewComponent;
 
+// DockView renders inside nc-dock's shadow root, so its CSS must be injected
+// there — not into document.head, which cannot cross the shadow boundary.
+// A <link> inside a shadow root is supported in all target browsers (Chrome 73+).
+function injectDockviewCss(shadowRoot: ShadowRoot, url: string): void {
+  if (shadowRoot.querySelector('link[data-nc-dockview]')) return;
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.setAttribute('data-nc-dockview', '');
+  link.href = url;
+  shadowRoot.appendChild(link);
+}
+
+// Injected AFTER the DockView <link> so document order gives us cascade priority
+// without needing !important. Lit's adoptedStyleSheets run before <link>/<style>
+// elements, so tab overrides must live here rather than in static styles.
+function injectNcTabStyles(shadowRoot: ShadowRoot): void {
+  if (shadowRoot.querySelector('style[data-nc-tabs]')) return;
+  const style = document.createElement('style');
+  style.setAttribute('data-nc-tabs', '');
+  style.textContent = `
+    /*
+     * Group panel: all four corners rounded.
+     * overflow:hidden (set by DockView) clips all children to this pill shape —
+     * the tab bar gets rounded top corners, content gets rounded bottom corners.
+     */
+    .dv-groupview {
+      border-radius: var(--nc-radius-md, 8px) !important;
+    }
+
+    /*
+     * Content area: square top-left (sits flush under the active tab),
+     * rounded everywhere else for the card look.
+     * overflow:hidden clips widget content to this shape.
+     *
+     * --nc-widget-radius override: widgets inside a dock panel inherit flat-top
+     * rounding so they don't double-round against the content container's own
+     * corners. No changes needed in widget files — the variable cascades in.
+     */
+    .dv-content-container {
+      border-radius: 0 var(--nc-radius-md, 8px) var(--nc-radius-md, 8px) var(--nc-radius-md, 8px) !important;
+      overflow: hidden;
+      --nc-widget-radius: 0 0 var(--nc-radius-md, 8px) var(--nc-radius-md, 8px);
+    }
+
+    /* All tabs: rounded top-right only by default */
+    .dv-tab {
+      border-radius: 0 var(--nc-radius-sm, 4px) 0 0 !important;
+    }
+
+    /* First tab: also round the top-left to match the group's corner */
+    .dv-tabs-container .dv-tab:first-child {
+      border-radius: var(--nc-radius-sm, 4px) var(--nc-radius-sm, 4px) 0 0 !important;
+    }
+
+    /* Active tab: primary-colored bottom indicator makes the active tab legible */
+    .dv-tab.dv-active-tab {
+      border-bottom: 2px solid var(--nc-color-primary, #4f8ef7) !important;
+    }
+
+    /* Subtle divider between tabs */
+    .dv-tab + .dv-tab {
+      border-left: 1px solid var(--nc-border, rgba(0,0,0,0.12)) !important;
+    }
+  `;
+  shadowRoot.appendChild(style);
+}
+
 /**
  * <nc-dock> — VS Code-style docking container.
  *
@@ -35,6 +102,22 @@ type DockviewComponent = import('dockview-core').DockviewComponent;
  */
 @customElement('nc-dock')
 export class NascachtDock extends LitElement {
+  /**
+   * CDN URL for the DockView ES module. Override before any <nc-dock> element
+   * is connected to pin a different version or use a local copy.
+   *
+   *   NascachtDock.dockviewUrl = 'https://esm.sh/dockview-core@4';
+   */
+  static dockviewUrl = 'https://esm.sh/dockview-core@4.13.1';
+
+  /**
+   * CDN URL for DockView's base stylesheet. Defaults to the same CDN and
+   * version as dockviewUrl. Override independently if needed.
+   *
+   *   NascachtDock.dockviewCssUrl = 'https://esm.sh/dockview-core@4/dist/styles/dockview.css';
+   */
+  static dockviewCssUrl = 'https://esm.sh/dockview-core@4.13.1/dist/styles/dockview.css';
+
   static override styles = css`
     :host {
       display: block;
@@ -63,27 +146,75 @@ export class NascachtDock extends LitElement {
     #dockview-host {
       width: 100%;
       height: 100%;
+      /* Inherited by all DockView children — DockView's own CSS never sets font-family */
+      font-family: var(--nc-font-family);
+      font-size: var(--nc-text-sm);
     }
 
     /*
-     * DockView renders into light DOM inside this element.
-     * Override its internal CSS vars to bridge into the nc token system.
-     * DockView uses --dv-* custom properties for its own theming.
+     * Full --dv-* → --nc-* bridge.
+     *
+     * We pass theme: { className: 'dockview-theme-nc' } to DockviewComponent.
+     * That class has no rules in DockView's CSS, so it sets no --dv-* values.
+     * These #dockview-host rules are the only source — nc tokens always win.
      */
     #dockview-host {
-      --dv-background-color:              var(--nc-dock-panel-bg);
-      --dv-tabs-and-actions-container-background-color: var(--nc-dock-tab-bg);
-      --dv-activegroup-visiblepanel-tab-background-color: var(--nc-dock-tab-active-bg);
-      --dv-activegroup-hiddenpanel-tab-background-color:  var(--nc-dock-tab-bg);
+      /* Backgrounds */
+      --dv-background-color:                              var(--nc-dock-panel-bg);
+      --dv-group-view-background-color:                   var(--nc-dock-panel-bg);
+
+      /* Tab bar */
+      --dv-tabs-and-actions-container-background-color:   var(--nc-dock-tab-bg);
+      --dv-tabs-and-actions-container-font-size:          var(--nc-text-sm);
+      --dv-tabs-and-actions-container-height:             var(--nc-dock-tab-height);
+
+      /* Tab backgrounds */
+      --dv-activegroup-visiblepanel-tab-background-color:   var(--nc-dock-tab-active-bg);
+      --dv-activegroup-hiddenpanel-tab-background-color:    var(--nc-dock-tab-bg);
       --dv-inactivegroup-visiblepanel-tab-background-color: var(--nc-dock-tab-bg);
-      --dv-tab-divider-color:             var(--nc-dock-border);
-      --dv-separator-border:              var(--nc-dock-sash-color);
-      --dv-pane-border-color:             var(--nc-dock-border);
-      --dv-font-family:                   var(--nc-font-family);
-      --dv-font-size:                     var(--nc-text-sm);
-      --dv-tab-color:                     var(--nc-dock-tab-text);
-      --dv-activegroup-visiblepanel-tab-color: var(--nc-dock-tab-active-text);
+      --dv-inactivegroup-hiddenpanel-tab-background-color:  var(--nc-dock-tab-bg);
+
+      /* Tab text */
+      --dv-tab-color:                                     var(--nc-dock-tab-text);
+      --dv-tab-font-size:                                 var(--nc-text-sm);
+      --dv-activegroup-visiblepanel-tab-color:            var(--nc-dock-tab-active-text);
+      --dv-activegroup-hiddenpanel-tab-color:             var(--nc-text-secondary);
+      --dv-inactivegroup-visiblepanel-tab-color:          var(--nc-dock-tab-text);
+      --dv-inactivegroup-hiddenpanel-tab-color:           var(--nc-text-disabled);
+      --dv-tab-divider-color:                             var(--nc-dock-border);
+      --dv-tab-margin:                                    0;
+
+      /* Borders & separators */
+      --dv-separator-border:                              var(--nc-dock-sash-color);
+      --dv-pane-border-color:                             var(--nc-dock-border);
+      --dv-pane-view-header-border-color:                 var(--nc-dock-border);
+      --dv-paneview-header-border-color:                  var(--nc-dock-border);
+      --dv-paneview-active-outline-color:                 var(--nc-color-primary);
+      --dv-border-radius:                                 0;
+
+      /* Sash (resize handles) */
+      --dv-sash-color:                                    transparent;
+      --dv-active-sash-color:                             var(--nc-dock-sash-hover);
+      --dv-active-sash-transition-duration:               var(--nc-duration-fast);
+      --dv-active-sash-transition-delay:                  0.5s;
+
+      /* Drag-over overlay */
+      --dv-drag-over-background-color:                    color-mix(in oklch, var(--nc-color-primary) 25%, transparent);
+      --dv-drag-over-border-color:                        var(--nc-color-primary);
+
+      /* Floating panels */
+      --dv-floating-box-shadow:                           var(--nc-shadow-lg);
+      --dv-overlay-z-index:                               var(--nc-z-overlay);
+
+      /* Misc UI */
+      --dv-tabs-container-scrollbar-color:                var(--nc-text-disabled);
+      --dv-icon-hover-background-color:                   color-mix(in oklch, var(--nc-text-primary) 10%, transparent);
+
+      /* Typography */
+      --dv-font-family:                                   var(--nc-font-family);
+      --dv-font-size:                                     var(--nc-text-sm);
     }
+
   `;
 
   // ── Context provision ─────────────────────────────────────────────────────
@@ -121,6 +252,8 @@ export class NascachtDock extends LitElement {
   }
 
   override async firstUpdated(): Promise<void> {
+    injectDockviewCss(this.renderRoot as ShadowRoot, NascachtDock.dockviewCssUrl);
+    injectNcTabStyles(this.renderRoot as ShadowRoot);
     await this._initDockView();
   }
 
@@ -154,14 +287,31 @@ export class NascachtDock extends LitElement {
     const host = this.renderRoot.querySelector<HTMLElement>('#dockview-host');
     if (!host) return;
 
-    const { DockviewComponent } = await import('dockview-core');
+    const { DockviewComponent } = await import(/* @vite-ignore */ NascachtDock.dockviewUrl) as typeof import('dockview-core');
 
     const dock = new (DockviewComponent as unknown as new (
       el: HTMLElement,
       opts: unknown
     ) => DockviewComponent)(host, {
+      // Custom theme class has no CSS rules in DockView's stylesheet, so DockView
+      // sets no --dv-* variables from it. Our #dockview-host rules (which map
+      // --nc-* tokens to --dv-* vars) become the only source — nc tokens win.
+      theme: { name: 'nc', className: 'dockview-theme-nc' },
       createComponent: (options: { id: string; name: string }) => {
-        return this._createPanelComponent(options.name);
+        const el = this._createPanelComponent(options.name);
+        return {
+          element: el,
+          // init() receives the params passed to addPanel — apply them as
+          // element properties so widgets render with their configured data.
+          init: (parameters: { params?: Record<string, unknown> }) => {
+            const config = parameters.params;
+            if (config) {
+              for (const [key, value] of Object.entries(config)) {
+                (el as unknown as Record<string, unknown>)[key] = value;
+              }
+            }
+          },
+        };
       },
     });
 
@@ -212,6 +362,7 @@ export class NascachtDock extends LitElement {
       id: descriptor.id,
       component: descriptor.widgetType,
       title: descriptor.title,
+      params: descriptor.config,
     });
   }
 

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/web-components';
 import { html } from 'lit';
-import '../widgets/nc-kpi.js';
+import '../widgets/nascacht-kpi.js';
 
 const meta: Meta = {
   title: 'Widgets/nc-kpi',

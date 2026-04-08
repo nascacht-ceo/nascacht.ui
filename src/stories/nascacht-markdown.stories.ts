@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/web-components';
 import { html } from 'lit';
-import '../widgets/nc-markdown.js';
+import '../widgets/nascacht-markdown.js';
 
 const meta: Meta = {
   title: 'Widgets/nc-markdown',

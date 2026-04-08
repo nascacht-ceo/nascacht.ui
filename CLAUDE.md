@@ -2,7 +2,7 @@
 
 ## What this project is
 
-`nascacht-ui` is a **framework-agnostic web component library** for building embeddable, dockable widget dashboards. It is a complete rewrite of `QboTemplateMixin` from `qbo4.Configuration`, with zero dependency on qbo4 or any app framework.
+`nascacht-ui` is a **framework-agnostic web component library** for building embeddable, dockable widget dashboards. 
 
 Core value propositions:
 - Business users can rearrange, hide, and add widgets (VS Code-style docking via DockView)

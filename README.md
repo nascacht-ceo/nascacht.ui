@@ -16,19 +16,19 @@ Framework-agnostic dockable widget library built on web components. Drop widgets
 ## Installation
 
 ```bash
-npm install nascacht-ui lit @lit/context dockview-core
+npm install nascacht-ui lit @lit/context
 ```
 
-> `lit`, `@lit/context`, and `dockview-core` are peer dependencies. They must be present in the host app.
+> `lit` and `@lit/context` are peer dependencies. `dockview-core` and `marked` are loaded lazily from CDN at runtime — see [Deployment](#deployment).
 
 ### CDN (no build step)
 
 ```html
-<link rel="stylesheet" href="https://unpkg.com/nascacht-ui/dist/esm/styles/themes/auto.css">
-<script type="module" src="https://unpkg.com/nascacht-ui/dist/bundle/index.js"></script>
+<link rel="stylesheet" href="https://esm.sh/nascacht-ui/dist/esm/styles/themes/auto.css">
+<script type="module" src="https://esm.sh/nascacht-ui/dist/bundle/index.js"></script>
 ```
 
-> **Note:** The bundled CDN build includes Lit. If your app also uses Lit, use the ESM build instead — two Lit instances on the same page breaks `@lit/context` propagation.
+> **Note:** The bundled build includes Lit. If your app also uses Lit, use the ESM build instead — two Lit instances on the same page breaks `@lit/context` propagation.
 
 ---
 
@@ -39,7 +39,7 @@ npm install nascacht-ui lit @lit/context dockview-core
 No provider, no dock needed. Works in any HTML page.
 
 ```html
-<nascacht-kpi label="Revenue" value="$1.2M" trend="+12%"></nascacht-kpi>
+<nc-kpi label="Revenue" value="$1.2M" trend="+12%"></nc-kpi>
 
 <script type="module">
   import 'nascacht-ui';
@@ -49,23 +49,22 @@ No provider, no dock needed. Works in any HTML page.
 ### Full dashboard
 
 ```html
-<nascacht-provider template-api-url="/api/templates">
-  <nascacht-dock layout-key="main-dashboard">
-  </nascacht-dock>
-</nascacht-provider>
+<nc-provider template-api-url="/api/templates">
+  <nc-dock layout-key="main-dashboard"></nc-dock>
+</nc-provider>
 
 <script type="module">
-  import { NascachtProvider, NascachtDock, NascachtKpi, NascachtMarkdown } from 'nascacht-ui';
+  import { NascachtDock } from 'nascacht-ui';
 
-  const dock = document.querySelector('nascacht-dock');
+  const dock = document.querySelector('nc-dock');
   dock.applyPatch({
     version: 1,
     root: {
       id: 'root',
       direction: 'horizontal',
       panels: [
-        { id: 'p1', widgetType: 'kpi',      title: 'Revenue',  visible: true, config: {} },
-        { id: 'p2', widgetType: 'markdown',  title: 'Notes',    visible: true, config: {} },
+        { id: 'p1', widgetType: 'kpi',      title: 'Revenue', visible: true, config: {} },
+        { id: 'p2', widgetType: 'markdown',  title: 'Notes',   visible: true, config: {} },
       ],
     },
   });
@@ -79,9 +78,9 @@ import 'nascacht-ui';
 
 export function Dashboard() {
   return (
-    <nascacht-provider template-api-url="/api/templates">
-      <nascacht-dock layout-key="main" style={{ width: '100%', height: '600px' }} />
-    </nascacht-provider>
+    <nc-provider template-api-url="/api/templates">
+      <nc-dock layout-key="main" style={{ width: '100%', height: '600px' }} />
+    </nc-provider>
   );
 }
 ```
@@ -94,14 +93,76 @@ import type { } from 'nascacht-ui';
 declare global {
   namespace JSX {
     interface IntrinsicElements {
-      'nascacht-provider': React.HTMLAttributes<HTMLElement> & { 'template-api-url'?: string };
-      'nascacht-dock':     React.HTMLAttributes<HTMLElement> & { 'layout-key'?: string; 'design-mode'?: boolean };
-      'nascacht-kpi':      React.HTMLAttributes<HTMLElement> & { label?: string; value?: string; trend?: string };
-      'nascacht-markdown': React.HTMLAttributes<HTMLElement> & { content?: string };
+      'nc-provider': React.HTMLAttributes<HTMLElement> & { 'template-api-url'?: string };
+      'nc-dock':     React.HTMLAttributes<HTMLElement> & { 'layout-key'?: string; 'design-mode'?: boolean };
+      'nc-kpi':      React.HTMLAttributes<HTMLElement> & { label?: string; value?: string; trend?: string };
+      'nc-markdown': React.HTMLAttributes<HTMLElement> & { content?: string };
     }
   }
 }
 ```
+
+---
+
+## Deployment
+
+nascacht-ui lazy-loads heavy dependencies (DockView, marked) at runtime so they never bloat your initial bundle. You control where they come from.
+
+### Tiers at a glance
+
+| Client | Build | CDN config |
+|--------|-------|------------|
+| Prototype / small site | `dist/bundle/` | None — esm.sh defaults work out of the box |
+| Production SaaS | `dist/bundle/` | Call `configureCdn()` to switch to a preferred CDN |
+| Enterprise / strict CSP | `dist/esm/` | Self-host deps; no external network calls at runtime |
+
+### Small / prototype — zero config
+
+The bundled build defaults to [esm.sh](https://esm.sh) (open-source, Cloudflare-backed) for all runtime deps. Nothing to configure.
+
+```html
+<script type="module" src="https://esm.sh/nascacht-ui/dist/bundle/index.js"></script>
+```
+
+### Production SaaS — override CDN URLs
+
+Call `configureCdn()` once in your app entry point, **before any nascacht-ui element connects to the DOM**:
+
+```ts
+import { configureCdn } from 'nascacht-ui';
+
+configureCdn({
+  marked:      'https://cdn.jsdelivr.net/npm/marked@15/+esm',
+  dockview:    'https://cdn.jsdelivr.net/npm/dockview-core@4.13.1/+esm',
+  dockviewCss: 'https://cdn.jsdelivr.net/npm/dockview-core@4.13.1/dist/styles/dockview.css',
+});
+```
+
+Each key maps to one lazily-loaded dep. Omit keys you don't need to change:
+
+| Key | Loaded by | Default URL |
+|-----|-----------|-------------|
+| `marked` | `<nc-markdown>` | `https://esm.sh/marked@15` |
+| `dockview` | `<nc-dock>` | `https://esm.sh/dockview-core@4.13.1` |
+| `dockviewCss` | `<nc-dock>` | `https://esm.sh/dockview-core@4.13.1/dist/styles/dockview.css` |
+
+> New lazy dependencies (CodeMirror, chart library) will be added to this table as the library grows. `configureCdn()` is the single place to configure all of them.
+
+### Enterprise — self-hosted, no external CDN
+
+Use the `dist/esm/` build and point all deps at files you serve yourself:
+
+```ts
+import { configureCdn } from 'nascacht-ui';
+
+configureCdn({
+  marked:      '/static/vendor/marked.js',
+  dockview:    '/static/vendor/dockview-core.js',
+  dockviewCss: '/static/vendor/dockview-core.css',
+});
+```
+
+Download the vendored files once (e.g. from the CDN URLs above) and check them into your static assets. No external network calls at runtime — safe for strict CSP, air-gapped networks, and apps that need 100% dependency auditability.
 
 ---
 
@@ -124,7 +185,7 @@ Add `data-nc-theme="dark"` to any container to scope dark mode to a subtree:
 
 ```html
 <div data-nc-theme="dark">
-  <nascacht-kpi label="Revenue" value="$1.2M"></nascacht-kpi>
+  <nc-kpi label="Revenue" value="$1.2M"></nc-kpi>
 </div>
 ```
 
@@ -133,7 +194,7 @@ Add `data-nc-theme="dark"` to any container to scope dark mode to a subtree:
 The entire color scale — primary, secondary, accent, status colors, surfaces, text, and shadows — derives from a single `--nc-brand` oklch color. Change the brand and everything updates.
 
 ```js
-const provider = document.querySelector('nascacht-provider');
+const provider = document.querySelector('nc-provider');
 provider.theme = {
   '--nc-brand': 'oklch(50% 0.22 160)',  // teal
 };
@@ -143,9 +204,9 @@ Or via CSS:
 
 ```css
 :root {
-  --nc-brand:      oklch(50% 0.22 160);  /* teal */
-  --nc-surface-l:  0.97;                 /* slightly off-white */
-  --nc-radius-unit: 2px;                 /* sharper corners */
+  --nc-brand:       oklch(50% 0.22 160);  /* teal */
+  --nc-surface-l:   0.97;                 /* slightly off-white */
+  --nc-radius-unit: 2px;                  /* sharper corners */
 }
 ```
 
@@ -166,7 +227,7 @@ Every component exposes CSS custom properties for its visual details, all defaul
 
 ```css
 /* Green values for a specific KPI */
-nascacht-kpi.profit {
+nc-kpi.profit {
   --nc-kpi-value-color: var(--nc-color-success);
 }
 
@@ -177,7 +238,7 @@ nascacht-kpi.profit {
 }
 
 /* Wider widget padding globally */
-nascacht-provider {
+nc-provider {
   --nc-widget-padding: var(--nc-space-6);
 }
 ```
@@ -188,7 +249,7 @@ See [Token reference](#token-reference) for the full list.
 
 ## Layout DSL
 
-`<nascacht-dock>` is driven by a JSON layout. Call `dock.applyPatch(layout)` to update the layout programmatically — from a user action, a server response, or AI output.
+`<nc-dock>` is driven by a JSON layout. Call `dock.applyPatch(layout)` to update the layout programmatically — from a user action, a server response, or AI output.
 
 ```ts
 interface DockLayout {
@@ -206,7 +267,7 @@ interface GroupDescriptor {
 
 interface PanelDescriptor {
   id: string;
-  widgetType: string;             // 'kpi' → registers as <nascacht-kpi>
+  widgetType: string;             // 'kpi' → resolves to <nc-kpi>
   title: string;
   visible: boolean;
   config: Record<string, unknown>;
@@ -224,9 +285,9 @@ dock.applyPatch({
     direction: 'horizontal',
     sizes: [30, 40, 30],
     panels: [
-      { id: 'revenue', widgetType: 'kpi',      title: 'Revenue',  visible: true, config: {} },
-      { id: 'notes',   widgetType: 'markdown',  title: 'Summary',  visible: true, config: {} },
-      { id: 'users',   widgetType: 'kpi',       title: 'Users',    visible: true, config: {} },
+      { id: 'revenue', widgetType: 'kpi',      title: 'Revenue', visible: true, config: {} },
+      { id: 'notes',   widgetType: 'markdown',  title: 'Summary', visible: true, config: {} },
+      { id: 'users',   widgetType: 'kpi',       title: 'Users',   visible: true, config: {} },
     ],
   },
 });
@@ -240,14 +301,13 @@ nascacht-ui is designed for AI-generated dashboards. Two output types are suppor
 
 ```ts
 type AiOutput =
-  | { type: 'template'; content: string }   // AI writes rendering logic
+  | { type: 'template'; content: string }            // AI writes rendering logic
   | { type: 'layout';   layout: Partial<DockLayout> }; // AI arranges panels
 ```
 
 **AI-generated layout:**
 
 ```ts
-// AI returns a layout patch → apply directly to the dock
 const aiResponse: AiOutput = await callYourAI(prompt);
 if (aiResponse.type === 'layout') {
   dock.applyPatch(aiResponse.layout);
@@ -256,17 +316,13 @@ if (aiResponse.type === 'layout') {
 
 **AI-generated template (via design mode + server compilation):**
 
-The AI writes a Lit tagged template string. It is sent to your server, compiled with esbuild into an ES module, and loaded via `import()`. The widget re-renders using the new module.
-
 ```ts
-// Template source — AI writes this
 const source = `return html\`
   <div style="color: \${component.value > 0 ? 'green' : 'red'}">
     \${component.label}: \${component.value}
   </div>
 \``;
 
-// POST to your template API
 await fetch('/api/templates', {
   method: 'POST',
   body: JSON.stringify({ prefix: 'NascachtKpi', templateType: 'custom', source }),
@@ -294,7 +350,6 @@ export class MySparkline extends NascachtTemplateMixin(LitElement) {
       border:        var(--nc-widget-border);
       border-radius: var(--nc-widget-radius);
 
-      /* Component tokens — override these per-instance or in your theme */
       --nc-sparkline-line-color: var(--nc-color-primary);
       --nc-sparkline-fill-color: var(--nc-color-primary-muted);
     }
@@ -303,7 +358,7 @@ export class MySparkline extends NascachtTemplateMixin(LitElement) {
   @property({ type: Array }) data: number[] = [];
 
   override defaultTemplate() {
-    return html`<canvas></canvas>`; // your render logic
+    return html`<canvas></canvas>`;
   }
 
   override fallbackTemplate() {
@@ -316,7 +371,7 @@ export class MySparkline extends NascachtTemplateMixin(LitElement) {
 }
 ```
 
-Then use it in a dock layout with `widgetType: 'sparkline'` — the dock resolves `customElements.get('my-sparkline')`.
+Use it in a dock layout with `widgetType: 'sparkline'` — the dock resolves `customElements.get('my-sparkline')`.
 
 ---
 
@@ -343,8 +398,7 @@ class ServerPersistenceAdapter implements PersistenceAdapter {
   }
 }
 
-// Pass via NascachtConfig
-const provider = document.querySelector('nascacht-provider');
+const provider = document.querySelector('nc-provider');
 provider.config = {
   templateApiUrl: '/api/templates',
   persistenceAdapter: new ServerPersistenceAdapter(),
@@ -358,8 +412,7 @@ provider.config = {
 Enable in-browser template editing for power users:
 
 ```html
-<nascacht-dock design-mode layout-key="dashboard">
-</nascacht-dock>
+<nc-dock design-mode layout-key="dashboard"></nc-dock>
 ```
 
 With `design-mode` set, each widget shows an editor (CodeMirror) that lets users write Lit template strings with live preview. Saving POSTs the source to `templateApiUrl`, receives a compiled ES module URL, and hot-reloads the widget.
@@ -380,7 +433,7 @@ With `design-mode` set, each widget shows an editor (CodeMirror) that lets users
 | `--nc-widget-shadow` | `var(--nc-shadow-sm)` | Widget drop shadow |
 | `--nc-widget-padding` | `var(--nc-space-4)` | Widget internal padding |
 
-### `<nascacht-kpi>`
+### `<nc-kpi>`
 
 | Token | Default | Description |
 |-------|---------|-------------|
@@ -390,7 +443,7 @@ With `design-mode` set, each widget shows an editor (CodeMirror) that lets users
 | `--nc-kpi-trend-up-color` | `var(--nc-color-success)` | Positive trend color |
 | `--nc-kpi-trend-down-color` | `var(--nc-color-error)` | Negative trend color |
 
-### `<nascacht-markdown>`
+### `<nc-markdown>`
 
 | Token | Default | Description |
 |-------|---------|-------------|
@@ -399,7 +452,7 @@ With `design-mode` set, each widget shows an editor (CodeMirror) that lets users
 | `--nc-md-code-bg` | `var(--nc-color-primary-muted)` | Inline code background |
 | `--nc-md-blockquote-border` | `var(--nc-color-primary)` | Blockquote left border |
 
-### `<nascacht-dock>`
+### `<nc-dock>`
 
 | Token | Default | Description |
 |-------|---------|-------------|

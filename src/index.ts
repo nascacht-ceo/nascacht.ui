@@ -1,5 +1,9 @@
 // Public API surface for nascacht-ui
 
+// CDN configuration — call configureCdn() before any elements connect
+export { configureCdn } from './cdn.js';
+export type { CdnUrls } from './cdn.js';
+
 // Elements — side-effect imports register custom elements
 export { NascachtProvider } from './dock/nascacht-provider.js';
 export { NascachtDock } from './dock/nascacht-dock.js';

@@ -13,7 +13,11 @@
       "Bash(npm install:*)",
       "Bash(npm run:*)",
       "Bash(code:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(find C:/Users/EricPatrick/source/repos/git/nascacht.ui/node_modules/dockview-core -name *.css)",
+      "Bash(node:*)",
+      "Bash(curl -s https://esm.sh/status)",
+      "WebFetch(domain:esm.sh)"
     ]
   }
 }

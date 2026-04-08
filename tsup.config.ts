@@ -14,15 +14,16 @@ export default defineConfig([
     splitting: true,
     treeshake: true,
   },
-  // Pre-bundled ESM + IIFE (Lit included)
-  // For CDN / <script type="module"> consumers with no build step
+  // Pre-bundled ESM + IIFE (Lit included, dockview-core loaded from CDN at runtime)
+  // For CDN / <script type="module"> consumers with no build step.
   // NOTE: consumers who use Lit in their own app will have two Lit instances;
   // @lit/context propagation between their app and nascacht-ui elements will fail.
-  // Document this in the integration guide and recommend the ESM build for Lit users.
+  // Recommend the ESM build for Lit users.
   {
     entry: ['src/index.ts'],
     format: ['esm', 'iife'],
     globalName: 'Nascacht',
+    external: ['dockview-core'],
     bundle: true,
     minify: true,
     sourcemap: true,

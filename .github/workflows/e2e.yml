@@ -1,0 +1,67 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  e2e:
+    name: Playwright E2E
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm           # caches the npm download cache (~/.npm)
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Cache the Chromium binary so it isn't re-downloaded on every run.
+      # Key includes the lock file so it refreshes when Playwright is updated.
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Playwright Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      # Re-run the system-dep install even on cache hit — the binaries are cached
+      # but OS-level deps (libglib, libnss, etc.) may not be.
+      - name: Install Chromium system dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      - name: Build Storybook
+        run: npm run build:storybook
+
+      - name: Run E2E tests
+        run: npm run test:e2e
+
+      # Renders pass/fail per test case in the workflow Summary tab —
+      # visible directly in GitHub without downloading anything.
+      - name: Publish test summary
+        uses: mikepenz/action-junit-report@v4
+        if: always()
+        with:
+          report_paths: test-results/junit.xml
+          check_name: Playwright results
+          fail_on_failure: true
+
+      # Full HTML report with traces — download from the Actions run page
+      # and open with: npx playwright show-report playwright-report
+      - name: Upload HTML report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
